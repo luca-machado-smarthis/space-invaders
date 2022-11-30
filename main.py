@@ -1,9 +1,20 @@
 from PPlay import sprite, mouse, window, keyboard
 import math
 import random
+import operator
 
 gamestate = 0
 difficulty = 2
+
+score_entries = []
+
+with open("ranking.txt") as file:
+    for line in file:
+        line = line.strip()
+        entry = list(map(str, line.split(',')))
+        entry[0] = int(entry[0])
+        score_entries.append(entry)
+        score_entries.sort(key=operator.itemgetter(0), reverse=True)
 
 frames = 0
 frame_time = 0
@@ -28,7 +39,6 @@ quit_img = sprite.Sprite("quit.png")
 quit_img.set_position(width/2-quit_img.width/2, (50+play.height)*3 + 25)
 
 ship = sprite.Sprite("ship.png")
-ship.set_position(width/2-ship.width/2, height-16-ship.height)
 
 projectiles_player = []
 projectiles_enemy = []
@@ -56,6 +66,7 @@ player_invincibility_cooldown = -2000
 
 def generate_enemy_wave(enemies, row, column, v_spread=50, h_spread=50):
     x_pos = 0
+    ship.set_position(width / 2 - ship.width / 2, height - 16 - ship.height)
     for i in range(row*column):
         enemy_sprite = sprite.Sprite("enemy.png")
         enemy_sprite.y = h_spread * math.ceil((i + 1) / row)
@@ -72,6 +83,7 @@ def generate_enemy_wave(enemies, row, column, v_spread=50, h_spread=50):
 
 
 while True:
+    janela.set_background_color([55,120,160])
     click = mouse.is_button_pressed(1)
     background.draw()
     if gamestate == 0:
@@ -88,11 +100,13 @@ while True:
             gamestate = 1
         if mouse.is_over_object(difficulty_img) and click:
             gamestate = 2
+        if mouse.is_over_object(ranking) and click:
+            gamestate = 3
         if mouse.is_over_object(quit_img) and click:
             janela.close()
 
     if gamestate == 1:
-        player_shot_cooldown += 400 * janela.delta_time()
+        player_shot_cooldown += 40000 * janela.delta_time()
         enemy_shot_cooldown += 200 * janela.delta_time()
         if keyboard.key_pressed("esc"):
             gamestate = 0
@@ -107,7 +121,7 @@ while True:
             shot = sprite.Sprite("projectile.png")
             shot.set_position(ship.x, ship.y)
             projectiles_player.append(shot)
-        if enemy_shot_cooldown > 200/difficulty:
+        if enemy_shot_cooldown > 200/difficulty and len(enemies) >= 1:
             enemy_shot_cooldown = 0
             shot = sprite.Sprite("projectile.png")
             rnd = random.randint(0, len(enemies)-1)
@@ -142,6 +156,9 @@ while True:
                         projectiles_player.clear()
                         player_shot_cooldown = 0
                         enemy_shot_cooldown = 0
+                        player_name = input("digite seu nome")
+                        with open("ranking.txt", "a") as file:
+                            file.write(f'\n{score},{player_name}')
                         score = 0
                         player_invincibility = False
                         player_invincibility_cooldown = 0
@@ -175,7 +192,15 @@ while True:
 
         LU_collision_point[0] += 10 * janela.delta_time() * enemy_direction
         RB_collision_point[0] += 10 * janela.delta_time() * enemy_direction
-
+        if len(enemies) <= 0:
+            projectiles_player.clear()
+            projectiles_enemy.clear()
+            player_shot_cooldown = 0
+            enemy_shot_cooldown = 0
+            player_invincibility = False
+            player_invincibility_cooldown = -2000
+            difficulty += 0.2
+            generate_enemy_wave(enemies, 8, 4)
 
     if gamestate == 2:
         easy.draw()
@@ -194,9 +219,17 @@ while True:
         frames += 1
         frame_time += janela.delta_time()
         if frame_time > 1:
-           # print(frames)
+            # print(frames)
             frame_time = 0
             frames = 0
+
+    if gamestate == 3:
+        for i in range (min(5, len(score_entries))):
+            janela.draw_text(f'{i+1} - {score_entries[i][1]} {score_entries[i][0]}', width/2-75, 50, size=24, color=[255,255,0])
+
+        if keyboard.key_pressed("esc"):
+            gamestate = 0
+
 
     click = False
     janela.update()
