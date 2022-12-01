@@ -4,17 +4,9 @@ import random
 import operator
 
 gamestate = 0
-difficulty = 2
+difficulty = 3
 
 score_entries = []
-
-with open("ranking.txt") as file:
-    for line in file:
-        line = line.strip()
-        entry = list(map(str, line.split(',')))
-        entry[0] = int(entry[0])
-        score_entries.append(entry)
-        score_entries.sort(key=operator.itemgetter(0), reverse=True)
 
 frames = 0
 frame_time = 0
@@ -26,6 +18,8 @@ width = 1200
 height = 600
 
 janela = window.Window(width, height)
+
+enemy_speed = 100
 
 background = sprite.Sprite("galaxy.jpeg")
 
@@ -47,11 +41,11 @@ player_lives = []
 enemies = []
 enemy_direction = 1
 
-easy = sprite.Sprite("play.png")
+easy = sprite.Sprite("easy.png")
 easy.set_position(width/2-easy.width/2, 25)
-normal = sprite.Sprite("play.png")
+normal = sprite.Sprite("medium.png")
 normal.set_position(width/2-normal.width/2, (50+play.height) + 25)
-hard = sprite.Sprite("play.png")
+hard = sprite.Sprite("hard.png")
 hard.set_position(width/2-hard.width/2, (50+play.height)*2 + 25)
 
 player_shot_cooldown = 0
@@ -63,6 +57,15 @@ score = 0
 
 player_invincibility = False
 player_invincibility_cooldown = -2000
+
+def load_ranking():
+    with open("ranking.txt") as file:
+        for line in file:
+            line = line.strip()
+            entry = list(map(str, line.split(',')))
+            entry[0] = int(entry[0])
+            score_entries.append(entry)
+            score_entries.sort(key=operator.itemgetter(0), reverse=True)
 
 def generate_enemy_wave(enemies, row, column, v_spread=50, h_spread=50):
     x_pos = 0
@@ -81,6 +84,7 @@ def generate_enemy_wave(enemies, row, column, v_spread=50, h_spread=50):
 
     return enemies
 
+load_ranking()
 
 while True:
     janela.set_background_color([55,120,160])
@@ -106,17 +110,15 @@ while True:
             janela.close()
 
     if gamestate == 1:
-        player_shot_cooldown += 40000 * janela.delta_time()
-        enemy_shot_cooldown += 200 * janela.delta_time()
-        if keyboard.key_pressed("esc"):
-            gamestate = 0
+        player_shot_cooldown += 400/(difficulty) * janela.delta_time()
+        enemy_shot_cooldown += 25 * difficulty * janela.delta_time()
         ship.draw()
         janela.draw_text(f'score: {score}', width/2, 20)
         ship.move_key_x(250 * janela.delta_time())
         if ship.x < 0 : ship.x = 0
         if ship.x > width-ship.width: ship.x = width-ship.width
 
-        if keyboard.key_pressed("space") and player_shot_cooldown > 100*difficulty:
+        if keyboard.key_pressed("space") and player_shot_cooldown > 100:
             player_shot_cooldown = 0
             shot = sprite.Sprite("projectile.png")
             shot.set_position(ship.x, ship.y)
@@ -159,6 +161,7 @@ while True:
                         player_name = input("digite seu nome")
                         with open("ranking.txt", "a") as file:
                             file.write(f'\n{score},{player_name}')
+                        load_ranking()
                         score = 0
                         player_invincibility = False
                         player_invincibility_cooldown = 0
@@ -170,19 +173,26 @@ while True:
 
         for enemy in enemies:
             enemy.draw()
-            enemy.x += 10 * janela.delta_time() * enemy_direction
+            enemy.x += enemy_speed * janela.delta_time() * enemy_direction
             if enemy.x < 0 or enemy.x > width-enemy.width:
                 enemy_direction *= -1
                 for enemy_ in enemies:
-                    enemy_.y += 50
-                LU_collision_point[1] += 50
-                RB_collision_point[1] += 50
+                    enemy_.x += enemy_direction*10
+                    enemy_.y += 30
+                LU_collision_point[0] += enemy_direction*10
+                RB_collision_point[0] += enemy_direction*10
+                LU_collision_point[1] += 30
+                RB_collision_point[1] += 30
             if enemy.y > ship.y:
                 enemies.clear()
                 projectiles_player.clear()
                 ship.set_position(width/2-ship.width/2, 600)
                 player_shot_cooldown = 0
                 enemy_shot_cooldown = 0
+                player_name = input("digite seu nome")
+                with open("ranking.txt", "a") as file:
+                    file.write(f'\n{score},{player_name}')
+                load_ranking()
                 score = 0
                 player_invincibility = False
                 player_invincibility_cooldown = 0
@@ -190,8 +200,8 @@ while True:
             for life in player_lives:
                 life.draw()
 
-        LU_collision_point[0] += 10 * janela.delta_time() * enemy_direction
-        RB_collision_point[0] += 10 * janela.delta_time() * enemy_direction
+        LU_collision_point[0] += enemy_speed * janela.delta_time() * enemy_direction
+        RB_collision_point[0] += enemy_speed * janela.delta_time() * enemy_direction
         if len(enemies) <= 0:
             projectiles_player.clear()
             projectiles_enemy.clear()
@@ -201,6 +211,17 @@ while True:
             player_invincibility_cooldown = -2000
             difficulty += 0.2
             generate_enemy_wave(enemies, 8, 4)
+        if keyboard.key_pressed("esc"):
+            enemies.clear()
+            projectiles_enemy.clear()
+            projectiles_player.clear()
+            player_lives.clear()
+            player_shot_cooldown = 0
+            enemy_shot_cooldown = 0
+            score = 0
+            player_invincibility = False
+            player_invincibility_cooldown = 0
+            gamestate = 0
 
     if gamestate == 2:
         easy.draw()
@@ -225,7 +246,7 @@ while True:
 
     if gamestate == 3:
         for i in range (min(5, len(score_entries))):
-            janela.draw_text(f'{i+1} - {score_entries[i][1]} {score_entries[i][0]}', width/2-75, 50, size=24, color=[255,255,0])
+            janela.draw_text(f'{i+1} - {score_entries[i][1]} {score_entries[i][0]}', width/2-75, 100 + 50*i, size=24, color=[255,255,0])
 
         if keyboard.key_pressed("esc"):
             gamestate = 0
